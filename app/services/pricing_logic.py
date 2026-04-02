@@ -1,2 +1,2 @@
-def is_good_price(current, usual_min):
-    return current <= usual_min
+def is_best_live_price(charger):
+    return charger.current_price <= 0.34 and charger.available_stalls >= 5

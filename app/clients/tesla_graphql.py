@@ -1,9 +1,8 @@
 import requests
-from app.config import TESLA_GRAPHQL_URL, TESLA_AUTH_TOKEN
-from app.models.charger import Charger
 import uuid
 
-request_id = str(uuid.uuid4())
+from app.config import TESLA_GRAPHQL_URL, TESLA_AUTH_TOKEN
+from app.models.charger import Charger
 
 GET_SITE_LIST_QUERY = """
 query getSiteList($siteFilter: SiteFilterInput!, $vehicleMakeType: VehicleMakeType!) {
@@ -12,6 +11,9 @@ query getSiteList($siteFilter: SiteFilterInput!, $vehicleMakeType: VehicleMakeTy
       __typename
       ...SiteBaseFragment
       ... on MapSiteROW {
+        isThirdPartySite
+        isCanvasSite
+        ownershipType
         pricing(vehicleMakeType: $vehicleMakeType) {
           ...MapSitePricingFragment
         }
@@ -21,39 +23,63 @@ query getSiteList($siteFilter: SiteFilterInput!, $vehicleMakeType: VehicleMakeTy
 }
 
 fragment SiteBaseFragment on SiteBase {
-  name
-  address {
-    ...AddressFragment
+  ... on SiteBase {
+    name
+    address {
+      ...AddressFragment
+    }
+    centroid {
+      ...LatLngFragment
+    }
+    entryPoint {
+      ...LatLngFragment
+    }
+    openToPublic
+    amenities
+    accessCode
+    activeOutageMessage
+    maxPowerKw
+    timeZone
+    locationGUID
+    trtId
+    powerType
+    accessType
+    openToNonTeslas
+    fastchargedbID
+    waitEstimateBucket
+    siteUsabilityArchetype
+    hasMagicDockAdapter
+    chargingAccessibility
+    displayName
+    displaySubTitle
+    localizedSiteName
+    isMagicDockSupportedSite
+    isMagicDockSupportedV2Site
+    haversineDistanceMiles
+    availableStalls
+    totalStalls
+    siteType
+    hasHighCongestion
+    openHour {
+      hour
+      openNow
+      shouldDisplay
+    }
+    additionalNavInstructions
+    teslaExclusive
+    siteCapabilities
+    owner
+    operator
+    payToPark
+    payToParkInstructions
+    parkingLevel
+    parkingLevelType
+    valetOnly
+    noRestrooms
+    accessRestriction
+    accessInstruction
+    criticalInfo
   }
-  centroid {
-    ...LatLngFragment
-  }
-  openToPublic
-  amenities
-  accessCode
-  activeOutageMessage
-  maxPowerKw
-  timeZone
-  locationGUID
-  trtId
-  powerType
-  accessType
-  openToNonTeslas
-  fastchargedbID
-  waitEstimateBucket
-  siteUsabilityArchetype
-  hasMagicDockAdapter
-  chargingAccessibility
-  displayName
-  displaySubTitle
-  localizedSiteName
-  isMagicDockSupportedSite
-  isMagicDockSupportedV2Site
-  haversineDistanceMiles
-  availableStalls
-  totalStalls
-  siteType
-  hasHighCongestion
 }
 
 fragment AddressFragment on Address {
@@ -77,6 +103,10 @@ fragment MapSitePricingFragment on SitePricing {
     activePricebook {
       charging {
         currencyCode
+        currencyComparisons {
+          toCurrency
+          exchangeRate
+        }
         rates
         dynamicRates {
           enabled
@@ -91,6 +121,7 @@ fragment MapSitePricingFragment on SitePricing {
 
 
 def fetch_nearby_superchargers(lat, lng):
+    request_id = str(uuid.uuid4())
     headers = {
         "Authorization": f"Bearer {TESLA_AUTH_TOKEN}",
         "Content-Type": "application/json",
@@ -141,7 +172,10 @@ def fetch_nearby_superchargers(lat, lng):
                           "externalChargers": False,
                           "openToNonTesla": True,
                           "privateDestinationChargers": False,
-                          "teslaDestinationChargers": True
+                          "teslaDestinationChargers": True,
+                          # Superchargers are not destination chargers; without this,
+                          # siteList can be empty when you expect stalls + kWh pricing.
+                          "teslaSuperchargers": True,
                       }
                   }
               ],
